@@ -18,7 +18,11 @@ OpenWrt PassWall2 代理工具的源码、安装包和配置指南，适配两�
 | 型号 | 架构 | 系统 | 包管理器 | 说明 |
 |------|------|------|----------|------|
 | Cudy TR3000 | aarch64_cortex-a53 | OpenWrt 25.12.4 | apk | 256MB 内存，PassWall2 26.9.16 |
+| Tenda BE12 Pro | aarch64_cortex-a53 | OpenWrt SNAPSHOT r34613（内核 6.18.31） | apk | 512MB/overlay 65MB，**未装 PassWall2**，但本仓库核心 apk（Xray/chinadns-ng/geoview/geo）被该设备的 **PassWall 一代**复用 |
 | GL.iNet GL-SFT1200 | mipsel (mips32r2) | OpenWrt 18.06 | opkg | 116MB 内存，未安装 PassWall2 |
+
+> 本仓库的核心 apk 是静态编译的 Go 程序（Xray/chinadns-ng/geoview 等），**不挑内核版本**，可跨 aarch64 设备复用（Tenda BE12 Pro 内核 6.18.31 实测可用）。
+> 仓库根已加 `.gitattributes`（`eol=lf`），Windows 检出也保持 LF。
 
 ## 目录结构
 
