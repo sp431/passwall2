@@ -27,7 +27,9 @@ passwall2/
 ├── README.md                               # 本文件
 ├── .gitignore
 ├── rudy-TR3000/                            # Cudy TR3000 (aarch64)
-│   ├── README.md                           # 安装说明
+│   ├── README.md                           # 安装说明 + 踩坑记录
+│   ├── scripts/
+│   │   └── install-passwall2.sh            # 一键安装脚本（含 world 约束防护）
 │   ├── src/                                # PassWall2 源码
 │   │   ├── etc/
 │   │   │   └── init.d/
@@ -134,6 +136,12 @@ passwall2/
 | `v2ray-geosite` | 2026-08-08 | GeoSite 域名数据库 |
 | `v2ray-plugin` | 5.49.0 | WebSocket 传输插件 |
 
+### rudy-TR3000/scripts/ — 安装脚本
+
+| 文件 | 用途 |
+|------|------|
+| `install-passwall2.sh` | 一键完成：备份 → 校验 apk 完整性 → **一次性装齐 18 个包** → 部署 src → 清缓存启用 |
+
 ### GL-SFT1200/
 
 此设备（GL.iNet GL-SFT1200, 116MB 内存）未安装 PassWall2。PassWall2 功能更复杂，建议在资源充裕的设备上使用。已安装的是 PassWall（非 PassWall2），详见 [passwall 仓库](https://github.com/sp431/passwall)。
@@ -142,26 +150,35 @@ passwall2/
 
 ### Cudy TR3000 (rudy-TR3000)
 
-```bash
-# 通过 apk 安装（推荐）
-apk update
-apk add luci-app-passwall2 luci-i18n-passwall2-zh-cn
+推荐用一键脚本：
 
-# 安装代理核心和依赖
-apk add xray-core sing-box chinadns-ng geoview \
-  hysteria naiveproxy \
+```bash
+cd /tmp/rudy-TR3000 && sh scripts/install-passwall2.sh
+```
+
+手动安装时，**必须一条命令装齐全部包**（原因见下方「注意事项」）：
+
+```bash
+apk update
+apk add luci-app-passwall2 luci-i18n-passwall2-zh-cn \
+  xray-core sing-box chinadns-ng geoview hysteria naiveproxy \
   shadowsocks-rust-sslocal shadowsocks-rust-ssserver \
   shadowsocksr-libev-ssr-local shadowsocksr-libev-ssr-redir shadowsocksr-libev-ssr-server \
-  simple-obfs-client tcping \
-  v2ray-geoip v2ray-geosite v2ray-plugin
+  simple-obfs-client tcping v2ray-geoip v2ray-geosite v2ray-plugin
 
-# 或从本仓库安装
-cp -r src/usr/share/passwall2 /usr/share/passwall2
-cp src/etc/init.d/passwall2 /etc/init.d/passwall2
-cp src/etc/init.d/passwall2_server /etc/init.d/passwall2_server
-cp packages/*.apk /tmp/ && apk add /tmp/*.apk
+# 或者完全离线安装（packages/ 中已包含全部 18 个包）
+apk add --allow-untrusted packages/*.apk
+
+# 部署源码 + 清缓存启用
+cd src && tar -cf - etc usr | (cd / && tar -xf -)
+chmod 755 /etc/init.d/passwall2 /etc/init.d/passwall2_server
+rm -f /tmp/luci-indexcache* ; rm -rf /tmp/luci-modulecache
 /etc/init.d/passwall2 enable
 ```
+
+> **注意**：不要把上面的 `apk add` 拆成多条依次执行。任何一条失败都会在
+> `/etc/apk/world` 留下未满足的约束，导致此后**所有 apk 命令报错**，
+> 且 `apk del` 清不掉。
 
 ### 添加 PassWall2 软件源
 
@@ -172,13 +189,21 @@ cp packages/*.apk /tmp/ && apk add /tmp/*.apk
 # https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-25.12/aarch64_cortex-a53/passwall2/packages.adb
 # https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-25.12/aarch64_cortex-a53/passwall_packages/packages.adb
 
-# 更新并安装（需 --allow-untrusted 选项）
+# 更新并安装（源使用自签名证书，需 --allow-untrusted）
 apk update --allow-untrusted
 apk add --allow-untrusted luci-app-passwall2 luci-i18n-passwall2-zh-cn
 ```
 
+> 实测：SourceForge 在部分网络下**只能读到索引文件**（几百字节），
+> 包体（几十 KB 以上）连接会被中断。如果遇到这种情况，直接用本仓库
+> `packages/` 离线安装即可，18 个包已齐全。
+
 ## 注意事项
 
+- **批量安装必须一次装齐**：失败会在 `/etc/apk/world` 留下未满足的约束，导致此后所有
+  apk 命令报错且 `apk del` 清不掉；修复需手工编辑 `/etc/apk/world` 并重新一次性安装
+- **下载包要校验字节数**：并行后台下载容易截断（apk 报 `Connection aborted`），
+  busybox 无 `stat`，用 `wc -c` 比对 GitHub 上的文件尺寸
 - PassWall 和 PassWall2 可共存，但建议只启用其中一个
 - PassWall2 共享 PassWall 的部分依赖包（xray-core, sing-box 等），与 passwall 仓库中的 packages 目录有重叠
 - iptables 模块 `socket` 可能不可用，PassWall2 使用 nftables 替代
